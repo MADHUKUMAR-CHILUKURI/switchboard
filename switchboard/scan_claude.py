@@ -119,6 +119,7 @@ def list_skills(claude_home: Path, project_dir: Path | None) -> list[dict]:
             add(source, cmd.stem, "command", cmd)
 
     skills_in(claude_home / "skills", "user")
+    commands_in(claude_home / "commands", "user")
 
     settings = [claude_home / "settings.json"]
     if project_dir is not None:
