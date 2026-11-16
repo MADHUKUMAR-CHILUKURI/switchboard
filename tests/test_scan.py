@@ -63,6 +63,11 @@ class ScanTest(unittest.TestCase):
         self.assertEqual(rec["plug:beta"]["source"], "plug")
         self.assertEqual(len(rec["user:alpha"]["content_hash"]), 16)
 
+    def test_lists_user_commands(self):
+        write(self.ch / "commands/zeta.md", "---\ndescription: User command zeta\n---\nDo it\n")
+        rec = {s["id"]: s for s in scan_claude.list_skills(self.ch, self.proj)}
+        self.assertEqual(rec["user:zeta"]["kind"], "command")
+
     def test_hygiene_fields(self):
         write(self.ch / "skills/long/SKILL.md", skill("long", "x" * 300))
         rec = {s["id"]: s for s in scan_claude.list_skills(self.ch, self.proj)}

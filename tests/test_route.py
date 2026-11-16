@@ -55,12 +55,22 @@ class RouteTest(unittest.TestCase):
     def test_past_choice_breaks_ties_only(self):
         task = {"targets": ["local-diff"], "focus": ["correctness"]}
         a = run(task)["candidates"]
-        key = lambda c: (c["score"], route._precision(dict(task, category="code-review"), c["profile"]))
-        tied = next(t for t in ([c["id"] for c in a if key(c) == key(x)] for x in a) if len(t) > 1)  # a full tie
+        tied = next(t for t in ([c["id"] for c in a if c["score"] == x["score"]] for x in a) if len(t) > 1)  # equal scores only
         b = ids(run(task, past=[{"date": "2026-11-01", "chosen": tied[-1]}]))
         self.assertLess(b.index(tied[-1]), b.index(tied[0]))  # the picked one moves ahead within its tie
         best = a[0]["id"]
         self.assertEqual(ids(run(task, past=[{"date": "2026-11-01", "chosen": a[-1]["id"]}] * 5))[0], best)
+
+    def test_lighter_skill_wins_a_tie_when_task_names_no_cost(self):
+        base = {"categories": ["testing"], "targets": ["repo"], "focus": ["tests"], "role": "performs", "stack": ["any"]}
+        profs = {"a:workflow": dict(base, cost="workflow", targets=["repo"]),  # more precise, but heavier
+                 "z:light": dict(base, cost="single-pass", targets=["repo", "local-diff"])}
+        inv = {k: {} for k in profs}
+        got = route.route({"category": "testing", "targets": ["repo"]}, profs, inv, [])["candidates"]
+        self.assertEqual([c["id"] for c in got], ["z:light", "a:workflow"])
+        self.assertEqual(got[0]["score"], got[1]["score"])
+        asked = route.route({"category": "testing", "targets": ["repo"], "cost": "workflow"}, profs, inv, [])
+        self.assertEqual(asked["candidates"][0]["id"], "a:workflow")  # a stated cost still wins on score
 
     def test_tag_stuffed_profile_does_not_outrank_precise_skill(self):
         profs = copy.deepcopy(FIX["profiles"])
