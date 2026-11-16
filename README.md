@@ -12,8 +12,9 @@ Switchboard profiles every installed skill from its full files. When two or more
 front of you, it shows you the best two or three, each with a one-line reason, and lets you pick.
 
 - **Asks only when it matters.** If one skill clearly fits, Claude uses it and says which.
-- **Fit decides the order.** Your past picks appear as labels ("you chose this last time"). They never
-  change the ranking.
+- **Fit decides the order.** Your past picks appear as labels ("you chose this last time") and only break
+  ties between equally good fits; they never lift a weaker fit above a better one. Skills built for another
+  language (a Kotlin reviewer on a Python task) rank below those that fit any stack.
 - **Local only.** No network, no API keys, no telemetry. Python 3 standard library.
 
 ![How Switchboard works: scan, profile, route, pick, learn](docs/images/workflow.svg)
@@ -22,7 +23,7 @@ front of you, it shows you the best two or three, each with a one-line reason, a
 
 - [Install](#install) · [First run](#first-run) · [How it works](#how-it-works) · [Commands](#commands)
 - [What you'll see](#what-youll-see) · [Activity report](#activity-report) · [Privacy](#privacy)
-- [Limits](#limits-in-v04) · [Uninstall](#uninstall) · [Development](#development)
+- [Limits](#limits-in-v04) · [Update](#update) · [Uninstall](#uninstall) · [Development](#development)
 
 ## Install
 
@@ -52,7 +53,7 @@ some are waiting.
 |---|---|---|
 | **1 · Scan** | Switchboard | At session start, a hook lists your user, project and enabled-plugin skills and commands, and fingerprints each one (its main file plus every `.md` in its folder). |
 | **2 · Profile** | Claude | `/switchboard:profile` has Claude fill a fixed schema per skill. A validator accepts only known fields, values from fixed lists and short text, so a skill's own text cannot steer the router. |
-| **3 · Route** | Claude + Switchboard | Before Claude uses a skill in a task area where several profiled skills overlap, it describes the task (category, role, targets, focus, stack) to the local `route` tool. Skills whose role matches the task (`performs` by default; `assists` for help around a task, such as answering review comments) rank first, then by how much of the task each covers. If Claude skips this step, a hook reminds it once. |
+| **3 · Route** | Claude + Switchboard | Before Claude uses a skill in a task area where several profiled skills overlap, it describes the task (category, role, targets, focus, stack) to the local `route` tool. Skills whose role matches the task (`performs` by default; `assists` for help around a task, such as answering review comments) rank first, then by how much of the task each covers. `route` returns up to 10 candidates and tells Claude to offer the best 2–3 with AskUserQuestion. If Claude skips routing or asking, a hook blocks the skill until a choice is recorded (at most twice per 10 minutes, so it never gets stuck). When your prompt looks like work in an overlapping area (review, debugging, tests, release…), a prompt hook also reminds Claude to route even if it was about to do the work without a skill; the prompt is matched in memory and never stored. |
 | **4 · Pick** | You | Claude shows the top two or three with a one-line reason each, and you choose. |
 | **5 · Learn** | Switchboard | Your pick is logged locally, shown as a label on similar tasks later, and feeds `/switchboard:audit` and the activity report. |
 
@@ -262,6 +263,20 @@ recording, create `~/.switchboard/settings.json` with `{"record_choices": false}
   for re-profiling.
 - Hygiene suggests whole plugins, not single plugin skills. Its token figures are estimates (about 4
   characters per token) and leave out agents, MCP tools and hooks.
+
+## Update
+
+```sh
+claude plugin marketplace update switchboard   # fetch the latest catalog
+claude plugin update switchboard@switchboard   # install the newer version
+```
+
+Restart Claude Code to load it. Updates follow the `version` in `.claude-plugin/plugin.json`: a release that
+does not bump it is not picked up. Your profiles and choices in `~/.switchboard` are kept; skills whose text
+changed are offered for re-profiling at the next session start.
+
+From a local checkout (`claude plugin marketplace add ./switchboard`), pull or edit the checkout, then run
+the same two commands.
 
 ## Uninstall
 

@@ -34,11 +34,33 @@ class RouteTest(unittest.TestCase):
     def test_heavy_multi_agent_pr(self):
         self.assertFirst({"targets": ["pr"], "depth": "thorough", "cost": "multi-agent"}, "ecc:review-pr")
 
-    def test_at_most_five_and_overlap_flag(self):
+    def test_limit_overlap_flag_and_next_step(self):
         r = run({"targets": ["pr"]})
-        self.assertEqual(len(r["candidates"]), 5)
+        self.assertEqual(len(r["candidates"]), min(len(FIX["profiles"]), route.LIMIT))
         self.assertTrue(r["overlap"])
-        self.assertEqual(route.route({"category": "docs"}, FIX["profiles"], FIX["inventory"], [])["candidates"], [])
+        self.assertIn("AskUserQuestion", r["next"])
+        self.assertIn("record_choice", r["next"])
+        empty = route.route({"category": "docs"}, FIX["profiles"], FIX["inventory"], [])
+        self.assertEqual(empty["candidates"], [])
+        self.assertNotIn("next", empty)
+
+    def test_skill_for_another_language_ranks_below_any_stack(self):
+        profs = copy.deepcopy(FIX["profiles"])
+        profs["ecc:orch-review"].update(stack=["kotlin"], focus=["correctness", "security"], depth="thorough")
+        task = {"category": "code-review", "targets": ["pr"], "focus": ["correctness", "security"], "depth": "thorough"}
+        for stack, last in ((None, True), (["python"], True), (["kotlin"], False)):
+            got = ids(route.route(dict(task, stack=stack) if stack else task, profs, FIX["inventory"], []))
+            self.assertEqual(got[-1] == "ecc:orch-review", last, (stack, got))
+
+    def test_past_choice_breaks_ties_only(self):
+        task = {"targets": ["local-diff"], "focus": ["correctness"]}
+        a = run(task)["candidates"]
+        key = lambda c: (c["score"], route._precision(dict(task, category="code-review"), c["profile"]))
+        tied = next(t for t in ([c["id"] for c in a if key(c) == key(x)] for x in a) if len(t) > 1)  # a full tie
+        b = ids(run(task, past=[{"date": "2026-11-01", "chosen": tied[-1]}]))
+        self.assertLess(b.index(tied[-1]), b.index(tied[0]))  # the picked one moves ahead within its tie
+        best = a[0]["id"]
+        self.assertEqual(ids(run(task, past=[{"date": "2026-11-01", "chosen": a[-1]["id"]}] * 5))[0], best)
 
     def test_tag_stuffed_profile_does_not_outrank_precise_skill(self):
         profs = copy.deepcopy(FIX["profiles"])
