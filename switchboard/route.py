@@ -11,6 +11,7 @@ ROLES = ("performs", "assists", "meta")  # kept equal to profiles.ROLES (tests/t
 W_TARGET, W_FOCUS, W_STACK, W_DEPTH, W_COST = 3, 2, 1, 1, 1
 LIMIT = 10  # a coarse shortlist: Claude picks the 2–3 to offer by best_for / not_for
 FULL_TAGS = 3  # a field with more tags than this is discounted
+COST_RANK = {"single-pass": 0, "multi-agent": 1, "workflow": 2}  # tie-break: the lighter skill first
 NEXT = ("Pick the 2–3 candidates whose best_for/not_for fit this task best and ask the user with AskUserQuestion "
         "(one option per skill, reason in its description, a past choice as a label), then call record_choice. "
         "If only one fits clearly, call record_choice with it and say which.")
@@ -60,11 +61,12 @@ def route(task: dict, profiles: dict, inventory: dict, past: list[dict]) -> dict
     # matching role first, then profiles not yet given a role, then the rest; score orders within each group
     group = lambda p: (0 if p.get("role") == want else 1 if "role" not in p else 2) * 2 + off_stack(p)
     picked = Counter(r.get("chosen") for r in past)
-    scored = [(group(p), score(task, p), _precision(task, p), picked[sid], sid) for sid, p in profiles.items()
-              if sid in inventory and cat in (p.get("categories") or [])]
-    scored.sort(key=lambda x: (x[0], -x[1], -x[2], -x[3], x[4]))
+    scored = [(group(p), score(task, p), COST_RANK.get(p.get("cost"), 1), _precision(task, p), picked[sid], sid)
+              for sid, p in profiles.items() if sid in inventory and cat in (p.get("categories") or [])]
+    # past picks right after score: precision is a continuous float, so behind it they would almost never act
+    scored.sort(key=lambda x: (x[0], -x[1], -x[4], x[2], -x[3], x[5]))
     cands = []
-    for _, s, _, _, sid in scored[:LIMIT]:
+    for _, s, *_, sid in scored[:LIMIT]:
         p = profiles[sid]
         cands.append({"id": sid, "score": s, "stale": p.get("content_hash") != inventory[sid].get("content_hash"),
                       "profile": p,
