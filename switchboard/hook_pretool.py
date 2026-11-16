@@ -55,7 +55,7 @@ try:
         denies = [t for t in state.get("denies") or [] if now - float(t) <= WINDOW]
         if len(denies) >= MAX_DENIES:
             return
-        inv = scan_claude.current()  # live scan: the shared inventory.json may belong to another project
+        inv = scan_claude.current(hashed=False)  # live scan: the shared inventory.json may belong to another project
         profs = profiles.load_all()
         overlap = set(route.overlap_categories(profs, inv))
         if not any(overlap & set(profs[pid].get("categories") or []) for pid in profile_ids(skill, profs) if pid in inv):

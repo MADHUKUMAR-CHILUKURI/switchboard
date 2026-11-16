@@ -150,6 +150,12 @@ class ScanTest(unittest.TestCase):
         after = {s["id"]: s["content_hash"] for s in scan_claude.list_skills(self.ch, self.proj)}
         self.assertNotEqual(before["user:alpha"], after["user:alpha"])
 
+    def test_unhashed_scan_lists_same_skills_without_hashes(self):
+        # hooks scan with hashed=False so a prompt never waits on reading every skill folder
+        fast = scan_claude.list_skills(self.ch, self.proj, hashed=False)
+        self.assertEqual({s["id"] for s in fast}, self.ids())
+        self.assertFalse(any("content_hash" in s for s in fast))
+
     def test_hash_changes_when_file_changes(self):
         before = {s["id"]: s["content_hash"] for s in scan_claude.list_skills(self.ch, self.proj)}
         write(self.ch / "skills/alpha/SKILL.md", skill("alpha", "User skill alpha") + "more\n")
