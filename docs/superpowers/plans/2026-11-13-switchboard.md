@@ -184,9 +184,9 @@ Fixture profiles: `review` (gstack, targets pr; focus merge-readiness, correctne
 
 ### Task 8: Replace ~/.skill-prefs (only after Task 7 passes and the user says go)
 
-- [ ] **Step 1:** Ask the user for go-ahead.
-- [ ] **Step 2:** Back up `~/.claude/CLAUDE.md` and `~/.claude/settings.json` to `~/.switchboard/backups/<timestamp>/`.
-- [ ] **Step 3:** Remove the block from `<!-- skill-prefs:begin` through `<!-- skill-prefs:end -->` in `~/.claude/CLAUDE.md`.
-- [ ] **Step 4:** Remove the SessionStart entry whose command runs `~/.skill-prefs/session_notice.py` from `~/.claude/settings.json`; confirm the file still parses as JSON.
-- [ ] **Step 5:** Delete `~/.skill-prefs`.
+- [x] **Step 1:** Ask the user for go-ahead.
+- [x] **Step 2:** Back up `~/.claude/CLAUDE.md` and `~/.claude/settings.json` to `~/.switchboard/backups/<timestamp>/`.
+- [x] **Step 3:** Remove the block from `<!-- skill-prefs:begin` through `<!-- skill-prefs:end -->` in `~/.claude/CLAUDE.md`.
+- [x] **Step 4:** Remove the SessionStart entry whose command runs `~/.skill-prefs/session_notice.py` from `~/.claude/settings.json`; confirm the file still parses as JSON.
+- [x] **Step 5:** Delete `~/.skill-prefs`.
 - [ ] **Step 6:** Restart Claude Code; confirm no skill-prefs notice and Switchboard still loads.

@@ -2,8 +2,8 @@
 1. Remember which skills the user named with /<skill> in this session, so the PreToolUse hook never blocks
    a skill the user asked for. Stores the names only, never prompt text.
 2. When the prompt looks like work in a task area where several installed skills overlap, remind Claude
-   to route and ask the user, even if it was about to do the work without a skill. At most once per
-   session per WINDOW, never after a recorded choice, never when the user named a skill. The prompt is
+   to route and ask the user, even if it was about to do the work without a skill. On every matching
+   prompt until a choice is recorded (then quiet for WINDOW), never when the user named a skill. The prompt is
    matched in memory and never stored.
 Fails open: any problem means exit 0."""
 import json
@@ -42,7 +42,8 @@ try:
     from switchboard import paths, profiles, route, scan_claude, usage
 
     def remind(prompt, state, now):
-        if any(now - float(state.get(k, 0)) <= WINDOW for k in ("chosen_at", "reminded_at")):
+        # only a recorded choice quiets it: a reminder Claude ignored must not silence the next prompts
+        if now - float(state.get("chosen_at", 0)) <= WINDOW:
             return None
         areas = [a for a, rx in AREA_RE.items() if rx.search(prompt)]
         if not areas:
@@ -63,9 +64,6 @@ try:
             if usage.recording_on():
                 usage.record(sorted(usage.resolve_ids(names)))
             state["named"] = sorted(set(state.get("named") or []) | names)[:MAX_NAMES]
-        if msg:
-            state["reminded_at"] = now
-        if names or msg:
             paths.write_private(sf, json.dumps(state))
         if msg:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": msg}}))
