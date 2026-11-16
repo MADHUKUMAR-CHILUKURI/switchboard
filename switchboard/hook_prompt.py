@@ -19,12 +19,13 @@ MAX_NAMES = 50
 WINDOW = 600  # same as hook_pretool.WINDOW
 # shortcut: keyword guess per task area, not a classifier; extend the words if an area is missed or noisy
 AREAS = {
-    "code-review": r"review\w*|pull request|\bprs?\b|diff",
-    "debugging": r"debug\w*|bugs?|crash\w*|stack ?trace|not working|broken|failing",
+    "code-review": r"review\w*|pull request|\bprs?\b|diff|refactor\w*|simplif\w*|clean ?up|analy[sz]\w*|check\w*",
+    "debugging": (r"debug\w*|bugs?|crash\w*|stack ?trace|not working|broken|failing|fix\w*|issues?|errors?|"
+                  r"exceptions?|why (?:does|is|do|are)\b|(?:doesn|isn|don)'?t (?:work|see|show)"),
     "testing": r"tests?|testing|coverage|tdd|e2e",
     "security": r"security|secure|vulnerab\w*|owasp|pentest|threat model",
     "ui-design": r"\bui\b|\bux\b|frontend|landing page|css|layout|redesign",
-    "planning": r"plan(ning)?|architect\w*|brainstorm\w*|spec\b|roadmap",
+    "planning": r"plan(ning)?|architect\w*|brainstorm\w*|spec\b|roadmap|implement\w*|build\w*|features?\b|design\b",
     "docs": r"docs?\b|documentation|readme|changelog",
     "git-release": r"commit|release|ship|merge|push",
     "cloud-devops": r"deploy\w*|docker|kubernetes|k8s|terraform|helm|ci/cd|pipeline|aws",
@@ -33,7 +34,8 @@ AREAS = {
 AREA_RE = {a: re.compile(rf"\b(?:{w})", re.I) for a, w in AREAS.items()}
 REMIND = ("Switchboard: this looks like {areas} work, where several installed skills overlap. Before doing it "
           "yourself or calling a skill, call the switchboard route tool, offer the user the top 2–3 with "
-          "AskUserQuestion and call record_choice. Skip this if the user already said how to do it.")
+          "AskUserQuestion and call record_choice. Skip this only if the user named a skill or said not to use "
+          "one; describing the task does not count.")
 
 try:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -68,7 +70,7 @@ try:
         if msg:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": msg}}))
 
-    main()
+    if __name__ == "__main__":  # importable so tests can check AREA_RE
+        main()
 except Exception:
     pass
-sys.exit(0)

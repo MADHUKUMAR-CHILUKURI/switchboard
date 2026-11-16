@@ -218,6 +218,21 @@ class HooksTest(unittest.TestCase):
         self.pretool(ROUTE_TOOL.replace("__route", "__record_choice"), {"chosen": "ecc:code-review"}, sid="s2")
         self.assertIsNone(self.reminder(self.prompt("review my diff", sid="s2")))
 
+    def test_prompt_areas_cover_everyday_task_wording(self):
+        from switchboard import hook_prompt
+        areas = lambda p: {a for a, rx in hook_prompt.AREA_RE.items() if rx.search(p)}
+        for p, want in [("fix the tie-breaking in route.py", "debugging"),
+                        ("why does the hook not fire?", "debugging"),
+                        ("I don't see any routing recommendations", "debugging"),
+                        ("analyze the router flow and find the issue", "code-review"),
+                        ("refactor scan_claude.py to be simpler", "code-review"),
+                        ("This plugin has to be generic. check this", "code-review"),
+                        ("implement user-level commands scanning", "planning"),
+                        ("add a feature to export the report as PDF", "planning")]:
+            self.assertIn(want, areas(p), p)
+        for p in ("thanks", "what time is it", "sounds good"):
+            self.assertEqual(areas(p), set(), p)
+
     def test_prompt_ignores_closing_tags(self):
         self.prompt("<summary>x</summary> <task-id>1</task-id> run /cso")
         state = json.loads(next((self.sb / "state").glob("*.json")).read_text())
