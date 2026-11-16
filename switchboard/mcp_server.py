@@ -11,7 +11,7 @@ from datetime import date  # noqa: E402
 
 from switchboard import choices, hygiene, profiles, report, route, scan_claude, usage  # noqa: E402
 
-VERSION = "0.5.0"
+VERSION = "0.5.1"
 PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")  # newest first; the subset this server speaks
 OBJ = {"type": "object"}
 STRS = {"type": "array", "items": {"type": "string"}}
@@ -32,7 +32,7 @@ def schema(props=None, required=()):
 
 
 TOOLS = [
-    {"name": "route", "description": "Rank installed skills that fit a task. Returns up to 5 candidates with profiles and past choices (labels only).",
+    {"name": "route", "description": "Rank installed skills that fit a task. Returns up to 10 candidates with profiles and past choices (tie-break only), and a `next` step.",
      "inputSchema": schema({"task": TASK}, ["task"])},
     {"name": "record_choice", "description": "Record which skill the user picked (task features and ids only).",
      "inputSchema": schema({"task": TASK, "offered": STRS, "chosen": {"type": "string"}}, ["task", "offered", "chosen"])},

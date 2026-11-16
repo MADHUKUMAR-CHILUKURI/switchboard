@@ -1,6 +1,6 @@
 """Score profiled skills against Claude's structured description of a task.
 
-Past choices are attached as labels after scoring and never change the order.
+Past choices only break ties between equal scores; they never lift a weaker fit above a better one.
 """
 from __future__ import annotations
 
@@ -9,8 +9,11 @@ from collections import Counter
 ROLES = ("performs", "assists", "meta")  # kept equal to profiles.ROLES (tests/test_route checks it)
 
 W_TARGET, W_FOCUS, W_STACK, W_DEPTH, W_COST = 3, 2, 1, 1, 1
-LIMIT = 5
+LIMIT = 10  # a coarse shortlist: Claude picks the 2–3 to offer by best_for / not_for
 FULL_TAGS = 3  # a field with more tags than this is discounted
+NEXT = ("Pick the 2–3 candidates whose best_for/not_for fit this task best and ask the user with AskUserQuestion "
+        "(one option per skill, reason in its description, a past choice as a label), then call record_choice. "
+        "If only one fits clearly, call record_choice with it and say which.")
 
 
 def _list(v):
@@ -51,18 +54,23 @@ def route(task: dict, profiles: dict, inventory: dict, past: list[dict]) -> dict
     if not isinstance(cat, str) or not cat:
         raise ValueError("task.category is required")
     want = task.get("role") if task.get("role") in ROLES else "performs"
+    stack = set(_list(task.get("stack")))
+    # a skill tied to other languages (no "any", no overlap with the task's stack) sorts below its role group
+    off_stack = lambda p: bool(p.get("stack")) and "any" not in p["stack"] and not stack & set(p["stack"])
     # matching role first, then profiles not yet given a role, then the rest; score orders within each group
-    group = lambda p: 0 if p.get("role") == want else 1 if "role" not in p else 2
-    scored = [(group(p), score(task, p), _precision(task, p), sid) for sid, p in profiles.items()
+    group = lambda p: (0 if p.get("role") == want else 1 if "role" not in p else 2) * 2 + off_stack(p)
+    picked = Counter(r.get("chosen") for r in past)
+    scored = [(group(p), score(task, p), _precision(task, p), picked[sid], sid) for sid, p in profiles.items()
               if sid in inventory and cat in (p.get("categories") or [])]
-    scored.sort(key=lambda x: (x[0], -x[1], -x[2], x[3]))
+    scored.sort(key=lambda x: (x[0], -x[1], -x[2], -x[3], x[4]))
     cands = []
-    for _, s, _, sid in scored[:LIMIT]:
+    for _, s, _, _, sid in scored[:LIMIT]:
         p = profiles[sid]
         cands.append({"id": sid, "score": s, "stale": p.get("content_hash") != inventory[sid].get("content_hash"),
                       "profile": p,
                       "past_choices": [r.get("date") for r in past if r.get("chosen") == sid]})
-    return {"candidates": cands, "overlap": len(cands) >= 2}
+    overlap = len(cands) >= 2
+    return {"candidates": cands, "overlap": overlap, **({"next": NEXT} if overlap else {})}
 
 
 def overlap_categories(profiles: dict, inventory: dict) -> list[str]:
