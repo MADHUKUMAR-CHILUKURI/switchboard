@@ -89,7 +89,8 @@ def _hash(path: Path, kind: str, data: bytes) -> str:
     return h.hexdigest()[:16]
 
 
-def list_skills(claude_home: Path, project_dir: Path | None) -> list[dict]:
+def list_skills(claude_home: Path, project_dir: Path | None, hashed: bool = True) -> list[dict]:
+    """hashed=False skips content hashes (reading every .md in each skill folder): hooks need only ids, fast."""
     out: dict[str, dict] = {}
 
     def add(source, name, kind, path):
@@ -108,7 +109,9 @@ def list_skills(claude_home: Path, project_dir: Path | None) -> list[dict]:
         if not desc:
             return
         out[sid] = {"id": sid, "name": name, "source": source, "kind": kind, "path": str(path),
-                    "description": desc[:240], "desc_chars": len(desc), "content_hash": _hash(path, kind, data)}
+                    "description": desc[:240], "desc_chars": len(desc)}
+        if hashed:
+            out[sid]["content_hash"] = _hash(path, kind, data)
 
     def skills_in(d, source):
         for sk in sorted(d.glob("*/SKILL.md")):
@@ -155,11 +158,11 @@ def list_skills(claude_home: Path, project_dir: Path | None) -> list[dict]:
     return list(out.values())
 
 
-def current() -> dict:
+def current(hashed: bool = True) -> dict:
     """Skills mapping {id: record} for this session (env overrides for tests)."""
     claude_home = Path(os.environ.get("SWITCHBOARD_CLAUDE_HOME") or Path.home() / ".claude")
     project = Path(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
-    return {s["id"]: s for s in list_skills(claude_home, project)}
+    return {s["id"]: s for s in list_skills(claude_home, project, hashed)}
 
 
 def write_inventory(skills: list[dict]) -> Path:

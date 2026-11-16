@@ -48,7 +48,7 @@ try:
         areas = [a for a, rx in AREA_RE.items() if rx.search(prompt)]
         if not areas:
             return None
-        overlap = set(route.overlap_categories(profiles.load_all(), scan_claude.current()))
+        overlap = set(route.overlap_categories(profiles.load_all(), scan_claude.current(hashed=False)))
         areas = [a for a in areas if a in overlap]
         return REMIND.format(areas=", ".join(areas)) if areas else None
 
