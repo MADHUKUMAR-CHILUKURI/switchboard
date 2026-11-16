@@ -104,17 +104,19 @@ class HooksTest(unittest.TestCase):
             self.env["CLAUDE_PROJECT_DIR"] = str(p)
             self.assertEqual(self.session(), "")
 
-    def test_pretool_denies_unrouted_overlap_skill_once(self):
+    def test_pretool_denies_unrouted_overlap_skill_at_most_twice(self):
         self.seed_review_profiles()
         out = self.pretool("Skill", {"skill": "ecc:code-review"})
         self.assertTrue(self.deny(out))
         self.assertIn("route", out["hookSpecificOutput"]["permissionDecisionReason"])
-        self.assertIsNone(self.pretool("Skill", {"skill": "ecc:code-review"}))
+        self.assertTrue(self.deny(self.pretool("Skill", {"skill": "ecc:code-review"})))
+        self.assertIsNone(self.pretool("Skill", {"skill": "ecc:code-review"}))  # capped: never stuck
 
-    def test_pretool_blocks_once_per_session_not_per_skill(self):
+    def test_pretool_cap_is_per_session_not_per_skill(self):
         self.seed_review_profiles()
         self.assertTrue(self.deny(self.pretool("Skill", {"skill": "ecc:code-review"})))
-        self.assertIsNone(self.pretool("Skill", {"skill": "review"}))  # another overlapping skill, same window
+        self.assertTrue(self.deny(self.pretool("Skill", {"skill": "review"})))  # another overlapping skill
+        self.assertIsNone(self.pretool("Skill", {"skill": "ecc:review-pr"}))  # same window, cap reached
         self.assertTrue(self.deny(self.pretool("Skill", {"skill": "review"}, sid="s2")))  # user skills by bare name
 
     def prompt(self, text, sid="s1"):
@@ -184,11 +186,46 @@ class HooksTest(unittest.TestCase):
         self.assertEqual(self.prompt(""), "")
         self.assertEqual(self.run_hook("hook_prompt.py", "not json"), "")
 
-    def test_pretool_allows_after_route(self):
+    def test_pretool_asks_for_a_choice_after_route_and_allows_after_record(self):
         self.seed_review_profiles()
         self.assertIsNone(self.pretool(ROUTE_TOOL, {"task": {"category": "code-review"}}))
+        out = self.pretool("Skill", {"skill": "ecc:code-review"})
+        self.assertTrue(self.deny(out))
+        self.assertIn("record_choice", out["hookSpecificOutput"]["permissionDecisionReason"])
+        self.assertIn("AskUserQuestion", out["hookSpecificOutput"]["permissionDecisionReason"])
+        self.assertIsNone(self.pretool(ROUTE_TOOL.replace("__route", "__record_choice"), {"chosen": "ecc:code-review"}))
         self.assertIsNone(self.pretool("Skill", {"skill": "ecc:code-review"}))
-        self.assertIsNotNone(self.pretool("Skill", {"skill": "ecc:code-review"}, sid="s2"))  # another session has not routed
+        self.assertIsNone(self.pretool("Skill", {"skill": "review"}))  # a recorded choice covers the window
+        self.assertIsNotNone(self.pretool("Skill", {"skill": "ecc:code-review"}, sid="s2"))  # another session has not chosen
+
+    def reminder(self, out):
+        return json.loads(out)["hookSpecificOutput"]["additionalContext"] if out.strip() else None
+
+    def test_prompt_reminds_to_route_overlap_work_once_per_window(self):
+        self.seed_review_profiles()
+        self.assertIsNone(self.reminder(self.prompt("what time is it")))  # no task area
+        msg = self.reminder(self.prompt("can you look over my diff before I open a pull request"))
+        self.assertIn("code-review", msg)
+        self.assertIn("AskUserQuestion", msg)
+        self.assertIsNone(self.reminder(self.prompt("now review the tests too")))  # once per window
+        state = json.loads(next((self.sb / "state").glob("*.json")).read_text())
+        self.assertNotIn("diff", json.dumps(state))  # prompt text is never stored
+
+    def test_prompt_no_reminder_after_choice_or_named_skill_or_without_overlap(self):
+        self.seed_review_profiles()
+        self.assertIsNone(self.reminder(self.prompt("review this with /ecc:code-review")))
+        self.assertIsNone(self.reminder(self.prompt("deploy it to kubernetes", sid="s3")))  # no overlap in that area
+        self.pretool(ROUTE_TOOL.replace("__route", "__record_choice"), {"chosen": "ecc:code-review"}, sid="s2")
+        self.assertIsNone(self.reminder(self.prompt("review my diff", sid="s2")))
+
+    def test_prompt_ignores_closing_tags(self):
+        self.prompt("<summary>x</summary> <task-id>1</task-id> run /cso")
+        state = json.loads(next((self.sb / "state").glob("*.json")).read_text())
+        self.assertEqual(state["named"], ["cso"])
+
+    def test_hooks_json_matches_record_choice(self):
+        hooks = json.loads((Path(__file__).parent.parent / "hooks/hooks.json").read_text())
+        self.assertIn(ROUTE_TOOL.replace("__route", "__record_choice"), hooks["hooks"]["PreToolUse"][0]["matcher"])
 
     def test_pretool_allows_non_overlap_skill(self):
         self.seed_review_profiles()
