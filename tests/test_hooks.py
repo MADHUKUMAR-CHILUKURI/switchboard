@@ -201,15 +201,18 @@ class HooksTest(unittest.TestCase):
     def reminder(self, out):
         return json.loads(out)["hookSpecificOutput"]["additionalContext"] if out.strip() else None
 
-    def test_prompt_reminds_to_route_overlap_work_once_per_window(self):
+    def test_prompt_reminds_to_route_overlap_work_until_a_choice(self):
         self.seed_review_profiles()
         self.assertIsNone(self.reminder(self.prompt("what time is it")))  # no task area
         msg = self.reminder(self.prompt("can you look over my diff before I open a pull request"))
         self.assertIn("code-review", msg)
         self.assertIn("AskUserQuestion", msg)
-        self.assertIsNone(self.reminder(self.prompt("now review the tests too")))  # once per window
-        state = json.loads(next((self.sb / "state").glob("*.json")).read_text())
-        self.assertNotIn("diff", json.dumps(state))  # prompt text is never stored
+        # an ignored reminder must not silence the next prompt
+        self.assertIsNotNone(self.reminder(self.prompt("now review the tests too")))
+        self.pretool(ROUTE_TOOL.replace("__route", "__record_choice"), {"chosen": "ecc:code-review"})
+        self.assertIsNone(self.reminder(self.prompt("review the rest")))  # quiet after a choice
+        for f in (self.sb / "state").glob("*.json"):
+            self.assertNotIn("diff", f.read_text())  # prompt text is never stored
 
     def test_prompt_no_reminder_after_choice_or_named_skill_or_without_overlap(self):
         self.seed_review_profiles()
