@@ -107,7 +107,8 @@ Profile skills for Switchboard.
    call `status` again and report how many domains were tagged and any failures. Once several skills end up
    sharing a domain tag, review the tag counts with the user and judge together whether a cluster is big enough
    to promote into a real category — there is no tool that does this automatically; it means adding the tag to
-   `CATEGORIES` in `switchboard/profiles.py` and rewriting the affected profiles' `categories` field by hand.
+   `CATEGORIES` in `switchboard/profiles.py` and rewriting the affected profiles' `categories` field by hand,
+   deleting their `domain` tag in the same edit (validation rejects `domain` once `other` is gone).
 7. If `status` shows `missing_focus_tag` above 0 (profiles with no `focus` values and no focus tag yet), call
    `pending_focus_tags` with `limit` 10, then with each `next_offset` until there is none, tell the user the
    count and a rough cost (about 300 tokens per skill), and ask with AskUserQuestion whether to tag focus now
@@ -131,7 +132,8 @@ Profile skills for Switchboard.
    call `status` again and report how many focus tags were set and any failures. Once several skills end up
    sharing a focus tag, review the tag counts with the user and judge together whether a cluster is big enough
    to promote into a real focus value — there is no tool that does this automatically; it means adding the tag
-   to `FOCUS` in `switchboard/profiles.py` and rewriting the affected profiles' `focus` field by hand.
+   to `FOCUS` in `switchboard/profiles.py` and rewriting the affected profiles' `focus` field by hand, deleting
+   their `focus_tag` in the same edit (validation rejects `focus_tag` once `focus` is nonempty).
 8. If `status` shows `missing_target_tag` above 0 (profiles with no `targets` values and no target tag yet),
    call `pending_target_tags` with `limit` 10, then with each `next_offset` until there is none, tell the user
    the count and a rough cost (about 300 tokens per skill), and ask with AskUserQuestion whether to tag targets
@@ -155,4 +157,5 @@ Profile skills for Switchboard.
    call `status` again and report how many target tags were set and any failures. Once several skills end up
    sharing a target tag, review the tag counts with the user and judge together whether a cluster is big enough
    to promote into a real target value — there is no tool that does this automatically; it means adding the tag
-   to `TARGETS` in `switchboard/profiles.py` and rewriting the affected profiles' `targets` field by hand.
+   to `TARGETS` in `switchboard/profiles.py` and rewriting the affected profiles' `targets` field by hand,
+   deleting their `target_tag` in the same edit (validation rejects `target_tag` once `targets` is nonempty).

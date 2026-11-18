@@ -53,7 +53,8 @@ def validate(p: dict, inventory: dict) -> list[str]:
     if "role" in p and p["role"] not in ROLES:
         errs.append(f"role: one of {', '.join(ROLES)}")
     for key in ("domain", "focus_tag", "target_tag"):
-        applicable = (key == "domain" and "other" in (p.get("categories") or [])
+        cats = p.get("categories")
+        applicable = (key == "domain" and isinstance(cats, list) and "other" in cats
                       or key == "focus_tag" and not p.get("focus")
                       or key == "target_tag" and not p.get("targets"))
         if key in p and (not applicable or not isinstance(p[key], str) or not p[key]

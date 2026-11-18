@@ -68,6 +68,11 @@ class ProfilesTest(unittest.TestCase):
         self.assertTrue(any(e.startswith("domain:") for e in profiles.validate(good(domain=""), INV)))
         self.assertEqual(profiles.validate(good(), INV), [])  # profiles without a domain tag stay valid
 
+    def test_domain_check_does_not_crash_on_malformed_categories(self):
+        errs = profiles.validate(good(categories=5, domain="video-editing"), INV)  # malformed, not a list
+        self.assertTrue(any(e.startswith("domain:") for e in errs))
+        self.assertTrue(any(e.startswith("categories:") for e in errs))
+
     def test_domain_rejected_without_other_category(self):
         self.assertTrue(any(e.startswith("domain:") for e in
                              profiles.validate(good(categories=["code-review"], domain="video-editing"), INV)))
