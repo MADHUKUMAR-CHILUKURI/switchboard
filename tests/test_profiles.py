@@ -3,6 +3,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from switchboard import profiles
 
@@ -66,6 +67,18 @@ class ProfilesTest(unittest.TestCase):
         self.assertTrue(any(e.startswith("domain:") for e in profiles.validate(good(domain="x" * 41), INV)))
         self.assertTrue(any(e.startswith("domain:") for e in profiles.validate(good(domain=""), INV)))
         self.assertEqual(profiles.validate(good(), INV), [])  # profiles without a domain tag stay valid
+
+    def test_domain_rejected_without_other_category(self):
+        self.assertTrue(any(e.startswith("domain:") for e in
+                             profiles.validate(good(categories=["code-review"], domain="video-editing"), INV)))
+
+    def test_focus_tag_rejected_when_focus_nonempty(self):
+        self.assertTrue(any(e.startswith("focus_tag:") for e in
+                             profiles.validate(good(focus=["security"], focus_tag="scraping-accuracy"), INV)))
+
+    def test_target_tag_rejected_when_targets_nonempty(self):
+        self.assertTrue(any(e.startswith("target_tag:") for e in
+                             profiles.validate(good(targets=["pr"], target_tag="media-assets"), INV)))
 
     def test_set_domain_updates_only_the_domain(self):
         profiles.save(good(categories=["other"]), INV)
@@ -151,6 +164,20 @@ class ProfilesTest(unittest.TestCase):
         cloned = profiles.load_all()["plug:beta"]
         self.assertEqual((cloned["id"], cloned["source"], cloned["content_hash"], cloned["does"]),
                          ("plug:beta", "plug", "a" * 16, "Reviews a PR for merge readiness."))
+
+    def test_pending_does_not_clone_across_different_kinds(self):
+        inv = {"user:alpha": dict(INV["user:alpha"]),
+               "plug:beta": dict(INV["plug:beta"], kind="agent", content_hash="a" * 16)}  # same content, different kind
+        self.assertEqual(profiles.save(good(), inv), [])
+        got = {p["id"] for p in profiles.pending(inv)}
+        self.assertEqual(got, {"plug:beta"})  # listed, not cloned: an agent can't reuse a skill's profile
+
+    def test_pending_falls_back_to_listing_when_clone_write_fails(self):
+        same = dict(INV, **{"plug:beta": dict(INV["plug:beta"], content_hash="a" * 16)})
+        self.assertEqual(profiles.save(good(), same), [])
+        with mock.patch("switchboard.profiles.paths.write_private", side_effect=OSError("disk full")):
+            got = profiles.pending(same)
+        self.assertEqual([p["id"] for p in got], ["plug:beta"])  # listed instead of raising out of pending()
 
     def test_pending_does_not_clone_from_a_stale_donor(self):
         self.assertEqual(profiles.save(good(), INV), [])

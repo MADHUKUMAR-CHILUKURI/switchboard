@@ -223,7 +223,8 @@ def _homes() -> tuple[Path, Path]:
 def current(hashed: bool = True) -> dict:
     """Skills mapping {id: record} for this session, plus any reported native skills (see report_native)."""
     out = {s["id"]: s for s in list_skills(*_homes(), hashed)}
-    out.update(native_skills())
+    names = {s["name"] for s in out.values()}
+    out.update({sid: s for sid, s in native_skills().items() if s.get("name") not in names})
     return out
 
 
@@ -252,10 +253,11 @@ def report_native(skills) -> int:
         desc = " ".join(str(s.get("description") or "").split())
         if not isinstance(name, str) or not name or len(name) > 100 or ":" in name or name in known_names or not desc:
             continue
+        desc_chars = len(desc)
         desc = desc[:NATIVE_DESC_MAX]
         sid = f"native:{name}"
         out[sid] = {"id": sid, "name": name, "source": "native", "kind": "skill", "path": None,
-                    "description": desc[:240], "desc_chars": len(desc),
+                    "description": desc[:240], "desc_chars": desc_chars,
                     "content_hash": hashlib.sha256(desc.encode()).hexdigest()[:16]}
     paths.write_private(_native_file(), json.dumps(out, indent=1, sort_keys=True))
     return len(out)

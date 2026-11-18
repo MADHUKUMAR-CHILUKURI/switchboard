@@ -45,6 +45,8 @@ class ScanTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
+        self._env_backup = {v: os.environ.get(v) for v in
+                             ("SWITCHBOARD_HOME", "SWITCHBOARD_CLAUDE_HOME", "CLAUDE_PROJECT_DIR")}
         os.environ["SWITCHBOARD_HOME"] = str(self.root / "sbhome")
         self.ch, self.proj = build_fixture(self.root)
         self.phash = hashlib.sha256(str(self.proj.resolve()).encode()).hexdigest()[:8]
@@ -53,8 +55,11 @@ class ScanTest(unittest.TestCase):
         os.environ["CLAUDE_PROJECT_DIR"] = str(self.proj)
 
     def tearDown(self):
-        for v in ("SWITCHBOARD_HOME", "SWITCHBOARD_CLAUDE_HOME", "CLAUDE_PROJECT_DIR"):
-            os.environ.pop(v, None)
+        for v, old in self._env_backup.items():
+            if old is None:
+                os.environ.pop(v, None)
+            else:
+                os.environ[v] = old
         self.tmp.cleanup()
 
     def ids(self):
@@ -251,6 +256,19 @@ class ScanTest(unittest.TestCase):
                                        {"name": "code-review", "description": "Real native"}])
         self.assertEqual(n, 1)
         self.assertEqual(set(scan_claude.native_skills()), {"native:code-review"})
+
+    def test_report_native_caps_entry_count(self):
+        many = [{"name": f"n{i}", "description": "x"} for i in range(scan_claude.NATIVE_MAX + 50)]
+        n = scan_claude.report_native(many)
+        self.assertEqual(n, scan_claude.NATIVE_MAX)
+        self.assertEqual(len(scan_claude.native_skills()), scan_claude.NATIVE_MAX)
+
+    def test_report_native_caps_description_length(self):
+        long_desc = "word " * scan_claude.NATIVE_DESC_MAX
+        scan_claude.report_native([{"name": "longdesc", "description": long_desc}])
+        rec = scan_claude.native_skills()["native:longdesc"]
+        self.assertLessEqual(len(rec["description"]), 240)
+        self.assertEqual(rec["desc_chars"], len(" ".join(long_desc.split())))
 
     def test_report_native_ignores_malformed_entries(self):
         bad = [{"name": "", "description": "x"}, {"name": "x" * 101, "description": "x"},

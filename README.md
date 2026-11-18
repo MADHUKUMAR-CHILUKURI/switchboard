@@ -23,7 +23,7 @@ front of you, it shows you the best two or three, each with a one-line reason, a
 
 - [Install](#install) · [First run](#first-run) · [How it works](#how-it-works) · [Commands](#commands)
 - [What you'll see](#what-youll-see) · [Activity report](#activity-report) · [Privacy](#privacy)
-- [Limits](#limits-in-v04) · [Update](#update) · [Uninstall](#uninstall) · [Development](#development)
+- [Limits](#limits-in-v07) · [Update](#update) · [Uninstall](#uninstall) · [Development](#development)
 
 ## Install
 

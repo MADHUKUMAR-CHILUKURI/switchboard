@@ -53,7 +53,10 @@ def validate(p: dict, inventory: dict) -> list[str]:
     if "role" in p and p["role"] not in ROLES:
         errs.append(f"role: one of {', '.join(ROLES)}")
     for key in ("domain", "focus_tag", "target_tag"):
-        if key in p and (not isinstance(p[key], str) or not p[key]
+        applicable = (key == "domain" and "other" in (p.get("categories") or [])
+                      or key == "focus_tag" and not p.get("focus")
+                      or key == "target_tag" and not p.get("targets"))
+        if key in p and (not applicable or not isinstance(p[key], str) or not p[key]
                          or len(p[key]) > TAG_MAX or not STACK_RE.match(p[key])):
             errs.append(f"{key}: a lowercase tag ([a-z0-9.+#-], at most {TAG_MAX} chars)")
     rec = inventory.get(p.get("id")) if isinstance(p.get("id"), str) else None
@@ -176,10 +179,14 @@ def load_all() -> dict[str, dict]:
 
 
 def _donor(have: dict, inventory: dict, sid: str, content_hash: str) -> dict | None:
-    """An already-profiled, still-current other id with this exact content: safe to clone, no judgment needed."""
+    """An already-profiled, still-current other id with this exact content and kind: safe to clone, no
+    judgment needed. Kind must match too: an agent's required multi-agent cost would be wrong for a skill
+    or command that happens to share the same content hash."""
+    kind = inventory.get(sid, {}).get("kind", "skill")
     for other, p in sorted(have.items()):
         if (other != sid and p.get("content_hash") == content_hash
-                and other in inventory and inventory[other].get("content_hash") == p.get("content_hash")):
+                and other in inventory and inventory[other].get("content_hash") == p.get("content_hash")
+                and inventory[other].get("kind", "skill") == kind):
             return p
     return None
 
@@ -195,7 +202,11 @@ def pending(inventory: dict) -> list[dict]:
         donor = _donor(have, inventory, sid, rec.get("content_hash"))
         if donor is not None:
             clone = dict(donor, id=sid, source=rec.get("source"), content_hash=rec.get("content_hash"))
-            if not save(clone, inventory):
+            try:
+                cloned = not save(clone, inventory)
+            except OSError:
+                cloned = False
+            if cloned:
                 have[sid] = clone
                 continue
         out.append({"id": sid, "kind": rec.get("kind", "skill"), "path": rec.get("path"),
